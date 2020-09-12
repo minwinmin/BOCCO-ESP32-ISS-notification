@@ -1,58 +1,58 @@
-//現在時刻を取得するプログラム　
-//参考　https://wak-tech.com/archives/833#i-6
-//JSONのあれこれを調べるには下記を使うと良い
-//https://arduinojson.org/v6/assistant/
-//エポックタイムをUTCに変換するための良い感じのライブラリがないので、変換してくれるAPIで代用する
-//https://unixtime.co.za/
-
-//httpのAPIは簡単にGETできる
-//httpsのAPIはちょっと大変かも
-
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <WiFiManager.h>
 #include <ArduinoJson.h>
-//エポックタイムを変換するため。
-//しかしうまく使えなかったAPIでなんとする。
-#include <TimeLib.h>
+
+///////////////////////////////////////////////
+//BOCCO API ライブラリ
+#include "config.h"
+#include "bocco_api.h"
+//BOCCO アカウント情報
+#define BOCCO_EMAIL     "xxxxxx"
+#define BOCCO_PASSWORD  "xxxxxx"
+#define BOCCO_API_KEY   "xxxxxx"
+#define ACCESS_TOKEN    "xxxxxx"
+BoccoAPI boccoAPI(BOCCO_EMAIL, BOCCO_PASSWORD, BOCCO_API_KEY);
+///////////////////////////////////////////////
+
+
+/////////////////////////////////////////////////
+////BOCCO API ライブラリ
+//#include "config.h"
+//#include "bocco_api.h"
+////BOCCO アカウント情報
+//#define BOCCO_EMAIL     "takuro.mikami@gmail.com"
+//#define BOCCO_PASSWORD  "24tnfowe34"
+//#define BOCCO_API_KEY   "9ebc34c1b90e437b7e4d641b17f400ce00d7eab553b38f3625a39efd4650276a"
+//#define ACCESS_TOKEN    "904306f1d55d76ff00bccf2a7c4a5da5de9bb29194d59b8f9d0c86f013fead3b"
+//BoccoAPI boccoAPI(BOCCO_EMAIL, BOCCO_PASSWORD, BOCCO_API_KEY);
+/////////////////////////////////////////////////
 
 //初期設定の為のアクセスポイント名
 #define AP_NAME "test"
 
-//任意場所の経度と緯度
+//任意場所の緯度と経度
 //35.691610, 139.712713
-#define API_URL "http://api.open-notify.org/iss-pass.json?lat=35.6918&lon=139.71&alt=10&n=10"
-#define API_URL_epock "https://showcase.api.linx.twenty57.net/UnixTime/fromunixtimestamp?unixtimestamp="
-
-//Unixtime to datetime
-#define year 31536000
-#define day 86400
-#define hour 3600
-#define second 60
-
-//jsonを扱うための初期化
-//下記の数字は大きめにとる
-//JSONの値が取れてない時の下記の容量が足りていないことが多い
+String LAT = "35.6918";
+String LON = "139.71";
+String API_URL = "http://api.open-notify.org/iss-pass.json?lat=" + LAT + "&lon=" + LON + "&alt=10&n=10";
+//APIでかえってきたJSONを格納する
+//容量は大きめに取る
 StaticJsonDocument<600> doc;
 
 //プッシュスイッチ
 const int SW = 0;
 int valueSW = HIGH;
 
-void clickSw(){
-  Serial.println("clickSw");
-  valueSW  = digitalRead(SW);
-}
+//unix timeを日付に変換したものを格納する配列
+int date[5];
 
-//unix time
-//UNIX時間とは、UTC時刻における1970年1月1日午前0時0分0秒（UNIXエポック）
-//からの経過秒数を計算したもの
+//unix timeとは、UTC時刻における1970年1月1日午前0時0分0秒（UNIXエポック）からの経過秒数を表す
 //JST(日本時間の場合)、これに9時間足したものになる。
 
+//参考
 //https://hackaday.io/page/4786-epoch-to-time-date-converter 参考
 void unixTimeToDaytime(int unixtime, int timezone_h, int timezone_m){
-//  int year_month[12]={0,31,59,90,120,151,181,212,243,274,304,334};
-//  int leapyear_month[12]={0,31,60,91,121,152,182,213,244,275,305,335};
   int year_month[12]={31,28,31,30,31,30,31,31,30,31,30,31};
   int leapyear_month[12]={31,29,31,30,31,30,31,31,30,31,30,31};
   
@@ -83,7 +83,7 @@ void unixTimeToDaytime(int unixtime, int timezone_h, int timezone_m){
   }
 
   int fixedElapsedYears = 1970+((ElapsedDays-leap_days)/365);
-  //0日は何から1を足している。
+  //0日はないから1を足す
   int day_of_year = ((ElapsedDays-leap_days)%365)+1;
   int temp_days;
   if(((fixedElapsedYears%4==0)&&(fixedElapsedYears%100!=0)) || (fixedElapsedYears%400==0)){
@@ -107,81 +107,38 @@ void unixTimeToDaytime(int unixtime, int timezone_h, int timezone_m){
 
   Serial.println("ElapsedYears : ");
   Serial.println(ElapsedYears);
+  date[0] = ElapsedYears;
   Serial.println("ElapsedMonths : ");
   Serial.println(ElapsedMonths);
+  date[1] = ElapsedMonths;
   Serial.println("ElapsedDate : ");
   Serial.println(ElapsedDate);
-//  Serial.println("ElapsedDays : ");
-//  Serial.println(ElapsedDays);
+  date[2] = ElapsedDate;
   Serial.println("ElapsedHours : ");
   Serial.println(ElapsedHours);
+  date[3] = ElapsedHours;
   Serial.println("ElapsedMinute : ");
   Serial.println(ElapsedMinute);
-  
-//  int ElapsedYears = fixedUnixTime / oneYear;
-//  int temp = fixedUnixTime % oneYear;
-//  int ElapsedDays = temp / oneDay;
-//  temp = temp % oneDay;
-//  int ElapsedHours = temp / oneHour;
-//  temp = temp % oneHour;
-////  Serial.println("temp is : ");
-////  Serial.println(temp);
-//  int ElapsedMinute = temp / oneMinute;
-//  Serial.println("ElapsedYears : ");
-//  Serial.println(ElapsedYears);
-//  Serial.println("ElapsedDays : ");
-//  Serial.println(ElapsedDays);
-//  Serial.println("ElapsedHours : ");
-//  Serial.println(ElapsedHours);
-//  Serial.println("ElapsedMinute : ");
-//  Serial.println(ElapsedMinute);
+  date[4] = ElapsedMinute;
 
-//  int i = 1;
-//  if (ElapsedDays%4 == 0){
-//    if (ElapsedDays%100 == 0){
-//      if(ElapsedDays%400 == 0){
-//        Serial.println("leap year");
-//        while(ElapsedDays > 31){
-//          ElapsedDays = ElapsedDays - leapyear_month[i];
-//          i += 1;
-//        }
-//      }else{
-//        Serial.println("normal year"); 
-//        while(ElapsedDays > 31){
-//          ElapsedDays = ElapsedDays - year_month[i];
-//          i += 1;
-//        }   
-//      }
-//    }else{
-//      Serial.println("leap year");
-//      while(ElapsedDays > 31){
-//      ElapsedDays = ElapsedDays - leapyear_month[i];
-//      i += 1;
-//      }
-//    }
-//  }else{
-//    Serial.println("normal year");
-//    while(ElapsedDays > 31){
-//      ElapsedDays = ElapsedDays - year_month[i];
-//      i += 1;
-//    }
-//  }
-//  Serial.println("Month : ");
-//  Serial.println(i);
-//  Serial.println("day : ");
-//  Serial.println(ElapsedDays);
+}
+
+//ボタン割り込み
+void clickSw(){
+  Serial.println("clickSw");
+  valueSW = digitalRead(SW);
+  Serial.println(valueSW);
 }
 
 void setup() {
   Serial.begin(115200);
-  Serial.println();
 
   WiFiManager wifiManager;
   wifiManager.setTimeout(180);
   if(!wifiManager.autoConnect(AP_NAME)) {
     Serial.println("timeout");
     delay(3000);
-    //初期設定が成功シない場合 reset して初期設定をリトライする
+    //初期設定が成功しない場合 reset して初期設定をリトライする
     ESP.restart();
     delay(5000);
     return;
@@ -190,22 +147,41 @@ void setup() {
   Serial.println("connected...");
   delay(1000);
 
-  //ボタン割り込み設定
+  //現在時刻を取得するための設定
+  //NTPの設定
+  configTime(9*3600L, 0, "ntp.nict.jp", "time.google.com", "ntp.jst.mfeed.ad.jp");
+
+  //////////////////////////////////////////
+  //アクセストークンを設定
+  boccoAPI.setAccessToken(ACCESS_TOKEN);
+
+  //BOCCO 1番目のルームを取得
+  if(!boccoAPI.getFirstRoom()){
+      Serial.println("BOCCO ルーム取得に失敗");
+      return;
+  }
+  //////////////////////////////////////////
+
   pinMode(SW, INPUT_PULLUP);
   attachInterrupt(SW, clickSw, CHANGE );
-
-  //正確な時刻の取得
-  ////NTPの設定
-  configTime(9*3600L, 0, "ntp.nict.jp", "time.google.com", "ntp.jst.mfeed.ad.jp");
 
 }
 
 //時刻を書くのするオブジェクト
 struct tm timeInfo;
-//文字格納
-char s[20];
 
 void loop() {
+  //正確な現在時刻を取得
+  //ある時刻にBOCCOを喋らせたい場合は、時刻でif文を書くと良い
+  //  getLocalTime(&timeInfo);
+  //  sprintf(s, " %04d/%02d/%02d %02d:%02d:%02d",
+  //          timeInfo.tm_year + 1900, timeInfo.tm_mon + 1, timeInfo.tm_mday,
+  //          timeInfo.tm_hour, timeInfo.tm_min, timeInfo.tm_sec);//人間が読める形式に変換
+  //  delay(1000);
+  //  Serial.println(s);//時間をシリアルモニタへ出力
+  //  delay(1000);
+
+  //スイッチが押された時にAPIから情報を取得
   if(valueSW == LOW){
     HTTPClient http;
     http.begin(API_URL);
@@ -214,16 +190,10 @@ void loop() {
     //返答がある場合
     if(httpCode > 0){
       String payload = http.getString();
-      //char json[] = payload;
-      //JsonObject object = doc.as();
       deserializeJson(doc, payload);
-      //Serial.println(httpCode);
-      //Serial.println(payload);
-
-      const char* message = doc["message"]; // "success"
+      const char* message = doc["message"]; 
       JsonObject request = doc["request"];
       int request_altitude = request["altitude"]; 
-      Serial.println(request_altitude);
       
       //JSONがさらに入れ子上になっているので、まずJSON Arrayに格納する
       //そこから２次元配列の要領で引き出す
@@ -235,42 +205,23 @@ void loop() {
       Serial.print("response_0_risetime : ");
       Serial.println(response_0_risetime);
 
+      //unixtimeを日付に変換
+      //unixTimeToDaytime(unixtime, 時差(時間) , 時差(分));
+      //JST（日本標準時）に変換する場合は下記の通り
       unixTimeToDaytime(response_0_risetime, 9, 0);
 
-//      char risetime =  unixTimeToDaytime(response_0_risetime);
-//      Serial.println(risetime);
-      HTTPClient https;
-      String API_URL_epock2 = API_URL_epock + String(response_0_risetime);
-      https.begin("https://showcase.api.linx.twenty57.net/UnixTime/fromunixtimestamp?unixtimestamp=1549892280");
-      int httpCode2 = https.GET();
-
-      //返答がある場合
-      if(httpCode2 > 0){
-        String payload2 = https.getString();
-        deserializeJson(doc, payload2);
-  //      const char* message = payload;
-        Serial.println("Risetime is : ");
-        Serial.println(payload2);
-        const char* message = doc["Datetime"];
-      }else{
-        Serial.println("None");
-      }
-  
-
+      String text = "ISSが" + String(date[1]) + "月" + String(date[2]) + "日" + String(date[3]) + "時"+ String(date[4]) + "分に通過するよ";
+      char c_text[50];
+      text.toCharArray(c_text, 50);
+      /////////////////////////////////////
+      boccoAPI.postMessageText(c_text);
+      Serial.println(text);      
+      /////////////////////////////////////
       
     }else{
       Serial.println("Error");
     }
+
   }
-
-
-  //正確な現在時刻を取得
-  getLocalTime(&timeInfo);
-  sprintf(s, " %04d/%02d/%02d %02d:%02d:%02d",
-          timeInfo.tm_year + 1900, timeInfo.tm_mon + 1, timeInfo.tm_mday,
-          timeInfo.tm_hour, timeInfo.tm_min, timeInfo.tm_sec);//人間が読める形式に変換
-  delay(1000);
-  Serial.println(s);//時間をシリアルモニタへ出力
-  delay(1000);
 
 }
