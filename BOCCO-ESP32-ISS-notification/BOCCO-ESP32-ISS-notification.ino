@@ -15,19 +15,6 @@
 BoccoAPI boccoAPI(BOCCO_EMAIL, BOCCO_PASSWORD, BOCCO_API_KEY);
 ///////////////////////////////////////////////
 
-
-/////////////////////////////////////////////////
-////BOCCO API ライブラリ
-//#include "config.h"
-//#include "bocco_api.h"
-////BOCCO アカウント情報
-//#define BOCCO_EMAIL     "takuro.mikami@gmail.com"
-//#define BOCCO_PASSWORD  "24tnfowe34"
-//#define BOCCO_API_KEY   "9ebc34c1b90e437b7e4d641b17f400ce00d7eab553b38f3625a39efd4650276a"
-//#define ACCESS_TOKEN    "904306f1d55d76ff00bccf2a7c4a5da5de9bb29194d59b8f9d0c86f013fead3b"
-//BoccoAPI boccoAPI(BOCCO_EMAIL, BOCCO_PASSWORD, BOCCO_API_KEY);
-/////////////////////////////////////////////////
-
 //初期設定の為のアクセスポイント名
 #define AP_NAME "test"
 
